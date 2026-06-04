@@ -783,9 +783,10 @@ function parseTransactions(text, src) {
       if (date > new Date()) date.setFullYear(year - 1);
       const amount = parseFloat(bm[4].replace(/,/g,''));
       let desc = bm[3].replace(/\s+/g,' ').trim().substring(0,60);
-      // Skip inter-account TEF transfers (always internal moves, not expenses)
-      if (/^TEF\s+(A|DE)\s*:/.test(desc)) continue;
-      // Skip SINPE with no description (can't determine if expense or income)
+      // TEF A (saliente) → gasto tipo sinpe
+      // TEF DE (entrante) → ingreso, excluir de gastos
+      if (/^TEF\s+DE\s*:/i.test(desc)) continue;
+      // SINPE sin descripción → skip (no se puede categorizar)
       if (/SINPE.*(Sin_Descripcion|Sin Descripcion)/i.test(desc)) continue;
       // Skip ATM deposits (DEP_ATM = incoming cash)
       if (/^DEP.ATM/i.test(desc)) continue;
@@ -838,6 +839,7 @@ function parseStdDate(s) {
 // ═══════════════════════════════════════════════════
 const RULES = [
   {re:/solidarist|fondo\s*(mutuo|invers|ahorro)|bac\s*ahorro|cuentas?\s*de\s*ahorro|aporte\s*(mensual|solidar)|inversiones?(\s+bac|\s+popular|\s+scotiabank)?/i, cat:'Ahorro/Inversión', type:'ahorro'},
+  {re:/^TEF\s+A\s*:|^SINPE\s+MOVIL|^SINPE_M/i, cat:'SINPE / Transferencia', type:'variable'},
   {re:/pago\s*tarjeta|pago\s*tc|pago\s*visa|pago\s*master|transferencia\s*propia/i, cat:'Pago Tarjeta', type:'tc'},
   {re:/alquiler|hipoteca|condominio|\bins\b|seguro|cnfl|\bice\b|acueducto|aya\b|telefon|internet|cable|netflix|spotify|amazon prime|disney/i, cat:'Servicios / Vivienda', type:'fijo'},
   {re:/farmac|medic|clinica|hospital|ccss|doctor|dent[ia]/i, cat:'Salud', type:'fijo'},
@@ -914,10 +916,10 @@ function buildResults() {
   `;
 
   // Framework bar — only meaningful when ingreso is defined
+  const libre = S.noSe ? 0 : Math.max(0, 100 - pA - pF - pV);
   if (S.noSe) {
     document.getElementById('fwBar').innerHTML = `<div class="fw-seg sl" style="flex:100;font-size:11px">Definí tu ingreso neto para ver la distribución</div>`;
   } else {
-    const libre = Math.max(0, 100 - pA - pF - pV);
     document.getElementById('fwBar').innerHTML = `
       ${pAhorro>0.5?`<div class="fw-seg sa" style="flex:${pAhorro}">${pAhorro.toFixed(0)}%</div>`:''}
       ${pInversion>0.5?`<div class="fw-seg si" style="flex:${pInversion}">${pInversion.toFixed(0)}%</div>`:''}
