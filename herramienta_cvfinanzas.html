@@ -356,6 +356,7 @@ input:focus,select:focus{border-color:var(--navy-mid)}
         <button class="tab-btn" onclick="tab('mes',this)">Por Mes</button>
         <button class="tab-btn" onclick="tab('det',this)">Detalle</button>
         <button class="tab-btn" onclick="tab('tc',this)" id="tabTC">Tarjetas</button>
+        <button class="tab-btn" onclick="tab('resumen',this)">Resumen</button>
       </div>
 
       <!-- CATEGORIAS -->
@@ -399,6 +400,11 @@ input:focus,select:focus{border-color:var(--navy-mid)}
       <!-- TARJETAS -->
       <div class="tab-panel" id="tab-tc">
         <div id="ccContent"></div>
+      </div>
+
+      <!-- RESUMEN DÉBITOS / CRÉDITOS -->
+      <div class="tab-panel" id="tab-resumen">
+        <div id="resumenContent"></div>
       </div>
     </div>
 
@@ -954,6 +960,7 @@ function buildResults() {
   buildMesTab(txs, months);
   buildDetTab(txs);
   buildTCTab();
+  buildResumenTab(txs, months);
   calcFE(3, document.querySelector('.fe-btn'));
 }
 
@@ -1192,6 +1199,72 @@ function buildTCTab() {
 
 // ═══════════════════════════════════════════════════
 //  FONDO DE EMERGENCIA
+// ═══════════════════════════════════════════════════
+//  RESUMEN TAB — Total débitos y créditos por mes
+// ═══════════════════════════════════════════════════
+function buildResumenTab(txs, months) {
+  const el = document.getElementById('resumenContent');
+  if (!el) return;
+
+  // Group by month
+  const byMonth = {};
+  months.forEach(mk => { byMonth[mk] = { debitos: 0, creditos: 0, nTx: 0 }; });
+  txs.forEach(t => {
+    if (!byMonth[t.mk]) byMonth[t.mk] = { debitos: 0, creditos: 0, nTx: 0 };
+    byMonth[t.mk].debitos += t.amount;
+    byMonth[t.mk].nTx++;
+  });
+
+  // Totals
+  const totalDebitos = txs.reduce((s, t) => s + t.amount, 0);
+  const n = months.length || 1;
+  const avgDebitos = totalDebitos / n;
+
+  const sym = S.reportMoneda === 'USD' ? '$' : '₡';
+  const fmtA = v => sym + v.toLocaleString('es-CR', {minimumFractionDigits:2, maximumFractionDigits:2});
+
+  let rows = months.map(mk => {
+    const m = byMonth[mk] || { debitos:0, nTx:0 };
+    const label = new Date(mk + '-15').toLocaleDateString('es-CR', {month:'short', year:'numeric'});
+    return `<tr>
+      <td>${label}</td>
+      <td class="amount">${fmtA(m.debitos)}</td>
+      <td style="text-align:right;color:var(--gray-text)">${m.nTx}</td>
+    </tr>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div class="cc-grid" style="margin-bottom:20px">
+      <div class="cc-item">
+        <div class="cc-lbl">Total Débitos (período)</div>
+        <div class="cc-val" style="color:var(--red)">${fmtA(totalDebitos)}</div>
+      </div>
+      <div class="cc-item">
+        <div class="cc-lbl">Promedio Mensual</div>
+        <div class="cc-val">${fmtA(avgDebitos)}</div>
+      </div>
+      <div class="cc-item">
+        <div class="cc-lbl">Meses analizados</div>
+        <div class="cc-val">${n}</div>
+      </div>
+      <div class="cc-item">
+        <div class="cc-lbl">Transacciones totales</div>
+        <div class="cc-val">${txs.length}</div>
+      </div>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="data-table">
+        <thead><tr>
+          <th>Mes</th>
+          <th style="text-align:right">Total Débitos</th>
+          <th style="text-align:right"># Transacciones</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
+}
+
 // ═══════════════════════════════════════════════════
 function calcFE(months, el) {
   document.querySelectorAll('.fe-btn').forEach(b=>b.classList.remove('active'));
