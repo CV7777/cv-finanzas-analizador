@@ -789,9 +789,7 @@ function parseTransactions(text, src) {
       if (date > new Date()) date.setFullYear(year - 1);
       const amount = parseFloat(bm[4].replace(/,/g,''));
       let desc = bm[3].replace(/\s+/g,' ').trim().substring(0,60);
-      // TEF A (saliente) → gasto tipo sinpe
-      // TEF DE (entrante) → ingreso, excluir de gastos
-      if (/^TEF\s+DE\s*:/i.test(desc)) continue;
+      // TEF A (saliente) → Otros; TEF DE (entrante) → Ingreso (incluir ambos, categorizer los clasifica)
       // SINPE sin descripción → skip (no se puede categorizar)
       if (/SINPE.*(Sin_Descripcion|Sin Descripcion)/i.test(desc)) continue;
       // Skip ATM deposits (DEP_ATM = incoming cash)
@@ -845,9 +843,14 @@ function parseStdDate(s) {
 // ═══════════════════════════════════════════════════
 const RULES = [
   {re:/solidarist|fondo\s*(mutuo|invers|ahorro)|bac\s*ahorro|cuentas?\s*de\s*ahorro|aporte\s*(mensual|solidar)|inversiones?(\s+bac|\s+popular|\s+scotiabank)?/i, cat:'Ahorro/Inversión', type:'ahorro'},
-  {re:/^TEF\s+A\s*:|^SINPE\s+MOVIL|^SINPE_M/i, cat:'SINPE / Transferencia', type:'variable'},
+  {re:/^TEF\s+DE\s*:/i, cat:'Ingreso', type:'ingreso'},
+  {re:/^TEF\s+A\s*:/i, cat:'Otros', type:'variable'},
+  {re:/^SINPE\s+MOVIL|^SINPE_M/i, cat:'SINPE / Transferencia', type:'variable'},
+  {re:/\bIVA\b/i, cat:'Impuestos', type:'fijo'},
+  {re:/spotify/i, cat:'Entretenimiento', type:'variable'},
   {re:/pago\s*tarjeta|pago\s*tc|pago\s*visa|pago\s*master|transferencia\s*propia/i, cat:'Pago Tarjeta', type:'tc'},
-  {re:/alquiler|hipoteca|condominio|\bins\b|seguro|cnfl|\bice\b|acueducto|aya\b|telefon|internet|cable|netflix|spotify|amazon prime|disney/i, cat:'Servicios / Vivienda', type:'fijo'},
+  {re:/alquiler|hipoteca|condominio|\bins\b|seguro|cnfl|\bice\b|acueducto|aya\b|telefon|internet|cable|netflix|amazon prime|disney/i, cat:'Servicios / Vivienda', type:'fijo'},
+  {re:/multimoney/i, cat:'Préstamos / Financiero', type:'fijo'},
   {re:/farmac|medic|clinica|hospital|ccss|doctor|dent[ia]/i, cat:'Salud', type:'fijo'},
   {re:/walmart|super\s*mas|pal[ií]|automercado|fresh market|perimercado|maxim[ea]|buen precio|supermercado|masxmenos|mas\s*x\s*menos/i, cat:'Supermercado', type:'fijo'},
   {re:/univer|colegio|escuel|matricula|coursera|udemy|platzi/i, cat:'Educación', type:'fijo'},
@@ -872,6 +875,7 @@ function buildResults() {
   const tot = {ahorro:0, fijo:0, variable:0, tc:0, total:0};
   txs.forEach(t => {
     const tp = t.cat.type;
+    if (tp === 'ingreso') return; // ingresos no cuentan como gasto
     if (tp === 'tc') { tot.tc += t.amount; return; }
     tot[tp] = (tot[tp]||0) + t.amount;
     tot.total += t.amount;
@@ -1056,6 +1060,8 @@ function filterDet() {
 
 const ALL_CATS = [
   {name:'Ahorro/Inversión',type:'ahorro'},{name:'Pago Tarjeta',type:'tc'},
+  {name:'Ingreso',type:'ingreso'},{name:'Impuestos',type:'fijo'},
+  {name:'Préstamos / Financiero',type:'fijo'},{name:'SINPE / Transferencia',type:'variable'},
   {name:'Servicios / Vivienda',type:'fijo'},{name:'Salud',type:'fijo'},
   {name:'Supermercado',type:'fijo'},{name:'Educación',type:'fijo'},
   {name:'Transporte',type:'fijo'},{name:'Restaurantes',type:'variable'},
